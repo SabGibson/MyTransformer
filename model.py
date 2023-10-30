@@ -152,6 +152,68 @@ class MultiHeadAttentionBlock(nn.Module):
         # (Batch,seq_len,d_model) -- > (Batch,seq_len,d_model)
         return self.w_o(x)
 
+class ResidualConnection(nn.Module):
+    def __init__(self,dropout:float) -> None:
+        """ 
+        ResidualConnection manager 
+        """
+        super().__init__()
+        self.dropout = nn.Dropout(dropout)
+        self.norm - LayerNormalization()
+
+    def forward(self,x,sublayer):
+        return x + self.dropout(sublayer(self.norm(x)))
 
 
+class EncoderBlock(nn.Module):
+    def __init__(self, self_attention_block : MultiHeadAttentionBlock , ff_block : PointwiseFeedForwardBlock, dropout : float) -> None:
+        super().__init__()
+        self.self_attention_block = self_attention_block
+        self.fd_block = ff_block
+        self.residual_connections = nn.ModuleList([ResidualConnection(dropout) for _ in range(2)])
 
+    def forward(self, x , src_mask):
+        x = self.residual_connections[0](x , lambda : self.self_attention_block(x,x,x,src_mask))
+        x = self.residual_connections[1](x , self.fd_block)
+        return x 
+    
+class Encoder(nn.Module):
+    def __init__(self,layers:nn.ModuleList):
+        super().__init__()
+        self.layers = layers
+        self.norm = LayerNormalization()
+
+    def forward(self,x,mask):
+        for layer in self.layers:
+            x = layer(x,mask)
+        return self.norm(x)
+
+
+class DecoderBlock(nn.Module):
+    def __init__(self,self_att : MultiHeadAttentionBlock , cross_att : MultiHeadAttentionBlock , ff_block : PointwiseFeedForwardBlock, dropout:float):
+        """ 
+        
+        """
+        super.__init__()
+        self.self_att_block = self_att
+        self.cross_att_block = cross_att
+        self.ff = ff_block
+        self. residual_connections = nn.ModuleList([ResidualConnection(dropout) for _ in range(3)])
+
+    def forward(self,x, encoder_output,enc_mask,dec_mask):
+        
+        x = self.residual_connections[0](x , lambda x : self.self_att_block(x,x,x,dec_mask))
+        x = self.residual_connections[1](x , lambda x : self.self_att_block(x,encoder_output,encoder_output,enc_mask))
+        x = self.residual_connections[2](x , self.ff)
+        return x
+    
+class Decoder(nn.Module):
+    def __init__(self, layers : nn.ModuleList):
+        self.layers = layers
+        self.norm = LayerNormalization()
+    
+    def forward(self,x,enc_output,enc_mask,dec_mask):
+        for layer in self.layers:
+            x = layer(x,enc_output,enc_mask,dec_mask)
+        return self.norm(x)
+    
